@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useEventContext } from '../context/eventContext';
 import axios from 'axios';
 
-const ExcelUpload = () => {
+const Dashboard = () => {
     const { eventId: routeEventId } = useParams();
     const { eventId } = useEventContext();
 
@@ -15,7 +15,6 @@ const ExcelUpload = () => {
     useEffect(() => {
         const fetchEventData = async () => {
         try {
-            // TODO: CHANGE THE URL
             const response = await axios.get(`http://localhost:8000/api/get-santa-pairs/?eventID=${eventId}`);
             
             if (response.status === 200 && response.data) {
@@ -42,22 +41,24 @@ const ExcelUpload = () => {
 
     return (
         <div>
-            <h2>Dashboard for Event ID: {eventId}</h2>
-
             {eventData ? (
-            <div>
-                <h3>Event Data</h3>
-                <pre>{JSON.stringify(eventData, null, 2)}</pre>
-            </div>
+                eventData.santaPairs && eventData.santaPairs.length > 0 ? (
+                <div>
+                    <h3>Event Data</h3>
+                    <pre>{JSON.stringify(eventData, null, 2)}</pre>
+                </div>
+                ) : (
+                <div>
+                    <h3>No Santa Pairs Found</h3>
+                </div>
+                )
             ) : (
-            <div>
-                <h3>No data found for this event. Please upload a file:</h3>
-                <input type="file" onChange={handleFileChange} />
-                <button onClick={handleFileUpload}>Upload File</button>
-            </div>
+                <div>
+                <h3>No Data</h3>
+                </div>
             )}
         </div>
         );
     };
 
-export default ExcelUpload;
+export default Dashboard;

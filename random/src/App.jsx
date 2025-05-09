@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { EventProvider } from './context/eventContext';
-import ExcelUpload from './pages/ExcelUpload';
+import Dashboard from './pages/Dashboard';
 import CreateEvent from './pages/createEvent';
 import ProtectedRoute from './authentication/protectedRoute';
 
@@ -14,7 +14,7 @@ function App() {
             path="/:eventId"
             element={
               <ProtectedRoute>
-                <ExcelUpload />
+                <Dashboard />
               </ProtectedRoute>
             }
           />
