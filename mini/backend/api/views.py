@@ -22,6 +22,12 @@ def get_all_events(request):
     serializer = EventListSerializer(events, many=True)
     return Response(serializer.data)
 
+@api_view(['GET'])
+def get_all_pairs(request):
+    pairs = SantaPair.objects.select_related('event').all()
+    serializer = SantaPairSerializer(pairs, many=True)
+    return Response(serializer.data)
+
 # Create your views here.
 @api_view(['POST'])
 def create_event(request):
@@ -46,7 +52,7 @@ def create_event(request):
             hashed_password = bcrypt.hashpw(user_password.encode('utf-8'), salt).decode('utf-8')
 
             EventList.objects.create(eventID=user_eventID, password=hashed_password)
-            return Response({'message': 'You are logged in'}, status=status.HTTP_201_CREATED)
+            return Response({'message': "Event Created Successfully"}, status=status.HTTP_201_CREATED)
 
     except json.JSONDecodeError:
         return Response({"error": "Invalid JSON"}, status=status.HTTP_400_BAD_REQUEST)
@@ -65,16 +71,14 @@ def generate_unique_id(request):
 @api_view(['POST'])
 def randomize_names(request):
     try:
-        data = json.loads(request.body)
-        user_eventID = data.get('eventID')
-        excel_file = request.FILES.get("file")
+        print(request.FILES)
+        user_eventID = request.POST.get('eventID')
+        excel_file = request.FILES.get('excel_file')
 
         if not user_eventID:
             return Response({"error": "Missing event ID"}, status=status.HTTP_400_BAD_REQUEST)
         if not excel_file:
             return Response({"error": "No File Uploaded"}, status=status.HTTP_400_BAD_REQUEST)
-        if not allowed_file(excel_file):
-            return Response({"error": "The uploaded file is not in excel format"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             try:
@@ -104,8 +108,11 @@ def randomize_names(request):
             pairs = []
             for og, ag in zip(original_names, assigned_names):
                 pair = SantaPair(event=event_instance, santaPair=f"{og} -> {ag}")
+                # Use bulk_create if creating multiple instances
                 pairs.append(pair)
-            SantaPair.objects.create(pair)
+
+            # Use bulk_create to insert multiple records at once
+            SantaPair.objects.bulk_create(pairs)
             
             return Response({"message": "Secret Santas assigned successfully!"}, status=status.HTTP_201_CREATED)
 
@@ -118,7 +125,7 @@ def randomize_names(request):
 # check for santa pairs with eventID
 @api_view(['GET'])
 def check_for_santapairs(request):
-    user_eventID = request.GET.get('eventID')
+    user_eventID = request.query_params.get('eventID')
 
     if not user_eventID:
         return Response({"error": "event ID query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -135,3 +142,51 @@ def check_for_santapairs(request):
 
     serializer = SantaPairSerializer(santa_pairs, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+# 
+@api_view(['GET'])
+def get_santa_pairs(request):
+    user_eventID = request.query_params.get('eventID')
+
+    if not user_eventID:
+        return Response({'error': 'eventID query parameter is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        event = EventList.objects.get(eventID=user_eventID)
+    except EventList.DoesNotExist:
+        return Response({'error': f'No event found with eventID: {user_eventID}'}, status=status.HTTP_404_NOT_FOUND)
+
+    santa_pairs = SantaPair.objects.filter(event=event)
+    data = [{'id': pair.id, 'santaPair': pair.santaPair} for pair in santa_pairs]
+
+    return Response({'eventID': user_eventID, 'santaPairs': data}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def get_specific_pair(request):
+    user_eventID = request.query_params.get('eventID')
+    user_pairID = request.query_params.get('id')
+
+    if not user_eventID or not user_pairID:
+        return Response(
+            {'error': 'Both eventID and id query parameters are required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        event = EventList.objects.get(eventID=user_eventID)
+    except EventList.DoesNotExist:
+        return Response({'error': f'No event found with eventID: {user_eventID}'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        santa_pair = SantaPair.objects.get(id=user_pairID, event=event)
+        data = {
+            'id': santa_pair.id,
+            'santaPair': santa_pair.santaPair,
+            'eventID': santa_pair.event.eventID,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+    except SantaPair.DoesNotExist:
+        return Response(
+            {'error': f'No SantaPair with id {user_pairID} found for eventID {user_eventID}.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
